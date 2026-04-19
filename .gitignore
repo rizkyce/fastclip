@@ -1,0 +1,33 @@
+# Dependencies
+node_modules
+/node_modules
+src-tauri/target
+target
+
+# Build Output
+dist
+/dist
+/src-tauri/gen
+
+# IDEs
+.vscode
+.idea
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Tauri
+src-tauri/icons/icon.ico
+src-tauri/icons/icon.png
+src-tauri/icons/icon.icns
+src-tauri/icons/png/*.png
+src-tauri/icons/*.png
+src-tauri/icons/AppleIcon.png

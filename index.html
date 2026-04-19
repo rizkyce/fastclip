@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="icon" type="image/svg+xml" href="/src/assets/logo.svg" />
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@100..900&family=Plus+Jakarta+Sans:ital,wght@0,200..800;1,200..800&family=JetBrains+Mono:wght@700&display=swap" rel="stylesheet text-glow">
+    <style>
+      :root { background-color: #020202; color: white; }
+      body { margin: 0; background: #020202; overflow: hidden; }
+      #root:empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        height: 100vh;
+        width: 100vw;
+      }
+      #root:empty::after {
+        content: "";
+        width: 32px;
+        height: 32px;
+        background: #4F46E5;
+        border-radius: 8px;
+        box-shadow: 0 0 40px rgba(79, 70, 229, 0.5);
+        animation: quick-pulse 0.8s infinite ease-in-out;
+      }
+      @keyframes quick-pulse {
+        0%, 100% { transform: scale(0.9); opacity: 0.6; }
+        50% { transform: scale(1.1); opacity: 1; filter: brightness(1.3); }
+      }
+    </style>
+    <title>FastClip AI</title>
+  </head>
+
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+
+    <script src="/src/index.tsx" type="module"></script>
+  </body>
+</html>
