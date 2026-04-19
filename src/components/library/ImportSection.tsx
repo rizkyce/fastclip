@@ -1,13 +1,41 @@
-import { Show, createSignal } from "solid-js";
+import { Show, createSignal, onMount, onCleanup } from "solid-js";
 import { Plus, Link2 } from "lucide-solid";
+import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import URLUpload from "../URLUpload";
 
 interface ImportSectionProps {
   onURLUpload: (url: string) => void;
+  onFileImport: () => void;
 }
 
 export default function ImportSection(props: ImportSectionProps) {
   const [importMode, setImportMode] = createSignal<"drop" | "url">("drop");
+  const [isOver, setIsOver] = createSignal(false);
+
+  let unlisten: (() => void) | undefined;
+
+  onMount(async () => {
+    unlisten = await listen<{ paths: string[] }>("tauri://drag-drop", async (event) => {
+      if (event.payload.paths.length > 0) {
+        setIsOver(false);
+        // Handle first file dropped
+        const path = event.payload.paths[0];
+        try {
+          await invoke("import_video_drop", { path });
+          props.onFileImport(); // Refresh
+        } catch (e) {
+          console.error("Drop import failed:", e);
+        }
+      }
+    });
+
+    // We can also listen for drag enter/leave if we want to change UI
+  });
+
+  onCleanup(() => {
+    if (unlisten) unlisten();
+  });
 
   const handleURLUpload = (url: string) => {
     props.onURLUpload(url);
@@ -18,6 +46,7 @@ export default function ImportSection(props: ImportSectionProps) {
     <div class="relative min-h-[400px] flex items-center justify-center">
       <Show when={importMode() === "drop"}>
         <div 
+          onClick={() => props.onFileImport()}
           class="w-full relative group cursor-pointer overflow-hidden rounded-3xl border border-white/5 bg-[#08080A]/50 backdrop-blur-3xl hover:border-primary/40 transition-all duration-500 animate-scale-in"
         >
           <div class="absolute inset-0 bg-gradient-to-br from-primary/5 via-transparent to-accent/5 opacity-0 group-hover:opacity-100 transition-opacity duration-1000" />

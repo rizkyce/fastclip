@@ -64,6 +64,14 @@ pub fn run() {
             crate::commands::settings::check_ffmpeg_status,
             crate::commands::settings::save_setting,
             crate::commands::settings::get_setting,
+            crate::commands::video::import_video_file,
+            crate::commands::video::import_video_drop,
+            crate::commands::library::get_all_videos,
+            crate::commands::library::delete_video,
+            crate::commands::library::search_videos,
+            crate::commands::analytics::get_dashboard_stats,
+            crate::commands::analytics::get_recent_projects,
+            crate::commands::analytics::get_active_ai_jobs,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

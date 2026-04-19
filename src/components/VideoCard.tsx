@@ -1,10 +1,10 @@
 import { Show } from "solid-js";
-import { cn } from "../lib/utils";
-import { Play, MoreVertical, Sparkles, Loader2 } from "lucide-solid";
-import type { Video } from "../store/projectStore";
+import { cn, formatDuration, formatFileSize } from "../lib/utils";
+import { Play, MoreVertical, Loader2 } from "lucide-solid";
+import { convertFileSrc } from "@tauri-apps/api/core";
 
 interface VideoCardProps {
-  video: Video;
+  video: any; // Using any for now or define a common type
   onClick?: () => void;
   onContextMenu?: (e: MouseEvent) => void;
 }
@@ -30,6 +30,15 @@ export default function VideoCard(props: VideoCardProps) {
     }
   };
 
+  // Format date
+  const formattedDate = () => {
+    try {
+      return new Date(props.video.created_at).toLocaleDateString();
+    } catch {
+      return "Unknown Date";
+    }
+  };
+
   return (
     <div
       class="glass-card group flex flex-col hover:border-primary/50 cursor-pointer"
@@ -38,18 +47,22 @@ export default function VideoCard(props: VideoCardProps) {
     >
       {/* Thumbnail */}
       <div class="aspect-video relative overflow-hidden rounded-xl bg-black shadow-inner">
-        <img
-          src={props.video.thumbnail}
-          alt={props.video.title}
-          class="w-full h-full object-cover opacity-80 group-hover:scale-110 group-hover:rotate-1 transition-all duration-700"
-          loading="lazy"
-        />
+        <Show when={props.video.thumbnail}>
+          <img
+            src={convertFileSrc(props.video.thumbnail!)}
+            alt={props.video.title}
+            class="w-full h-full object-cover opacity-80 group-hover:scale-110 group-hover:rotate-1 transition-all duration-700"
+            loading="lazy"
+          />
+        </Show>
         <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-100 group-hover:opacity-0 transition-opacity duration-500" />
 
         {/* Duration Badge */}
         <div class="absolute top-4 left-4">
           <div class="px-2.5 py-1 bg-black/60 backdrop-blur-md border border-white/10 rounded-lg">
-            <span class="text-[9px] font-black text-white uppercase tracking-tight">{props.video.duration}</span>
+            <span class="text-[9px] font-black text-white uppercase tracking-tight">
+              {formatDuration(props.video.duration_ms)}
+            </span>
           </div>
         </div>
 
@@ -77,7 +90,7 @@ export default function VideoCard(props: VideoCardProps) {
       {/* Content */}
       <div class="pt-6 flex-1 flex flex-col">
         <div class="flex items-start justify-between gap-4 mb-4">
-          <h4 class="font-bold text-white text-lg tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-2">{props.video.title}</h4>
+          <h4 class="font-bold text-white text-lg tracking-tight leading-tight group-hover:text-primary transition-colors line-clamp-1">{props.video.title}</h4>
           <button
             class="btn-ghost shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
             onClick={(e) => { e.stopPropagation(); props.onContextMenu?.(e as any); }}
@@ -94,22 +107,17 @@ export default function VideoCard(props: VideoCardProps) {
           <Show when={props.video.codec}>
             <span class="tag">{props.video.codec}</span>
           </Show>
+          <span class="tag">{formatFileSize(props.video.size_bytes)}</span>
         </div>
 
         {/* Footer */}
         <div class="mt-auto flex items-center justify-between border-t border-white/5 pt-4">
           <div class="flex items-center gap-2">
             <div class="w-1.5 h-1.5 rounded-full bg-slate-600" />
-            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">{props.video.date}</span>
+            <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">{formattedDate()}</span>
           </div>
           <div class="flex items-center gap-3">
-            <Show when={(props.video.highlights ?? 0) > 0}>
-              <div class="flex items-center gap-1">
-                <Sparkles size={10} class="text-primary" />
-                <span class="text-[10px] font-black text-primary tracking-wider">{props.video.highlights}</span>
-              </div>
-            </Show>
-            <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider">{props.video.size}</span>
+            <span class="text-[10px] font-black text-slate-500 uppercase tracking-wider italic">FastClip Raw</span>
           </div>
         </div>
       </div>
