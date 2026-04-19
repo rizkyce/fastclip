@@ -12,7 +12,7 @@ export default function Timeline(props: TimelineProps) {
       {/* Waveform Visualization (Mock) */}
       <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
         <div class="flex items-center gap-1.5 h-32">
-          {Array.from({ length: 40 }).map((_, i) => (
+          {Array.from({ length: 40 }).map(() => (
             <div 
               class="w-2.5 bg-primary rounded-full transition-all duration-300 group-hover:bg-primary/50" 
               style={{ height: `${20 + Math.random() * 80}%` }} 
@@ -24,7 +24,7 @@ export default function Timeline(props: TimelineProps) {
       {/* Markers (AI Generated) */}
       <div class="absolute inset-0 z-10">
         <For each={props.highlights}>
-          {(h, i) => (
+          {(_, i) => (
             <div 
               class="absolute top-0 bottom-0 border-x border-primary/20 flex flex-col items-center group/marker cursor-pointer"
               style={{ left: `${15 + i() * 18}%`, width: `${8 + Math.random() * 5}%` }}

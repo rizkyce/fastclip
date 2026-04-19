@@ -1,6 +1,6 @@
 import { Show } from "solid-js";
 import { cn } from "../lib/utils";
-import { Play, MoreVertical, Sparkles, Loader2 } from "lucide-solid";
+import { Play, MoreVertical, Sparkles } from "lucide-solid";
 import type { Video } from "../store/projectStore";
 
 interface VideoListRowProps {

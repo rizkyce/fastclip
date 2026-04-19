@@ -1,5 +1,5 @@
 import { Router, Route } from "@solidjs/router";
-import { lazy, Suspense } from "solid-js";
+import { lazy } from "solid-js";
 import Layout from "./components/Layout";
 import ToastContainer from "./components/Toast";
 

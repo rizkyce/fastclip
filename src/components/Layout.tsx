@@ -1,4 +1,4 @@
-import { ParentProps, For, createSignal, onMount, Suspense } from "solid-js";
+import { ParentProps, For, createSignal, onMount, Suspense, Show } from "solid-js";
 import { A, useLocation } from "@solidjs/router";
 import {
   Home,
@@ -22,7 +22,7 @@ import {
 import { cn } from "../lib/utils";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import KeyboardShortcutsOverlay from "./KeyboardShortcutsOverlay";
-import { uiState, actions } from "../store";
+import { uiState } from "../store";
 
 const appWindow = getCurrentWindow();
 
@@ -135,7 +135,7 @@ export default function Layout(props: ParentProps) {
        <aside class={cn(
         "fixed md:relative inset-0 md:inset-auto m-0 md:m-4 w-full md:w-64 bg-white/[0.04] backdrop-blur-3xl md:rounded-2xl flex flex-col transition-all duration-500 z-[70] md:z-[55] overflow-hidden shadow-2xl border-r border-white/10 md:border md:border-white/[0.06]",
         isMobileMenuOpen() ? "translate-x-0 opacity-100" : "-translate-x-full md:translate-x-0 opacity-0 md:opacity-100"
-      )} style={{ "transform-property": "transform, opacity", "transform": "translateZ(0)" }}>
+      )} style={{ "transition-property": "transform, opacity", "transform": "translateZ(0)" }}>
         {/* Header inside Sidebar */}
         <div class="flex items-center justify-between p-6 md:p-10 shrink-0">
           <div class="flex flex-col gap-1">

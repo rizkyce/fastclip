@@ -1,5 +1,4 @@
-import { createStore, produce } from "solid-js/store";
-import { createMemo } from "solid-js";
+import { createStore } from "solid-js/store";
 import { MOCK_STATS, MOCK_PROJECTS, MOCK_AI_JOBS } from "../mock/data";
 
 interface UIState {
@@ -56,7 +55,7 @@ export const actions = {
     setState("ui", "activeAIJobId", videoId);
     // Add optimistic notification
     const id = Math.random().toString(36).substr(2, 9);
-    setState("ui", "notifications", (prev) => [...prev, { id, type: "info", message: "AI processing started..." }]);
+    setState("ui", "notifications", (prev) => [...prev, { id, type: "info" as const, message: "AI processing started..." }]);
     
     // Auto-remove notification after 3s
     setTimeout(() => {

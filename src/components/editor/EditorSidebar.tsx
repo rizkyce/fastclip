@@ -43,16 +43,16 @@ export default function EditorSidebar(props: EditorSidebarProps) {
             <h4 class="text-[10px] uppercase font-black tracking-widest text-slate-500 mb-6">Detected Highlights</h4>
             <For each={props.highlights}>
               {(h) => (
-                <div class="glass-card-flat !p-4 group cursor-pointer hover:border-primary/40 transition-all">
+                 <div class="glass-card-flat !p-4 group cursor-pointer hover:border-primary/40 transition-all">
                   <div class="flex items-center justify-between mb-3">
-                    <span class="text-[10px] font-black font-mono text-primary">{h.startTime} - {h.endTime}</span>
+                    <span class="text-[10px] font-black font-mono text-primary">{h.start} - {h.end}</span>
                     <Show when={h.status === "approved"}>
                       <CheckCircle2 size={12} class="text-emerald-500" />
                     </Show>
                   </div>
-                  <h5 class="text-xs font-bold text-white mb-2 leading-relaxed">{h.description}</h5>
+                  <h5 class="text-xs font-bold text-white mb-2 leading-relaxed">{h.transcript}</h5>
                   <div class="flex items-center gap-2">
-                    <span class="px-2 py-0.5 bg-primary/20 text-primary rounded text-[9px] font-black italic uppercase">Score: {h.score}</span>
+                    <span class="px-2 py-0.5 bg-primary/20 text-primary rounded text-[9px] font-black italic uppercase">Score: {h.confidence}</span>
                     <button class="ml-auto opacity-0 group-hover:opacity-100 transition-opacity btn-glass !p-1.5">
                       <ChevronRight size={12} />
                     </button>

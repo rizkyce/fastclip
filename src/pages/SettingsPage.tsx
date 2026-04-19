@@ -1,11 +1,13 @@
-import { For, Show, createSignal } from "solid-js";
+import { For, Show, createSignal, onMount } from "solid-js";
+import { invoke } from "@tauri-apps/api/core";
 import {
   Package, HardDrive, Cpu, ExternalLink, Palette,
-  Monitor, FolderOpen, Bell, Key, Globe, Sparkles
+  Monitor, FolderOpen, Bell, Key, Check
 } from "lucide-solid";
 import { cn } from "../lib/utils";
 import { showToast } from "../components/Toast";
 import Dropdown, { type DropdownOption } from "../components/Dropdown";
+import { settingsStore } from "../store/settingsStore";
 
 const accentColors = [
   { name: "Indigo", value: "#4F46E5" },
@@ -28,13 +30,6 @@ const whisperOptions: DropdownOption[] = whisperModels.map(m => ({
   value: m.value
 }));
 
-const languageOptions: DropdownOption[] = [
-  { label: "Auto Detect", value: "auto" },
-  { label: "English", value: "en" },
-  { label: "Indonesian", value: "id" },
-  { label: "Japanese", value: "ja" },
-  { label: "Korean", value: "ko" },
-];
 
 interface SettingRowProps {
   icon: any;
@@ -66,18 +61,77 @@ function SettingRow(props: SettingRowProps & { noBorder?: boolean }) {
 }
 
 export default function SettingsPage() {
-  const [selectedAccent, setSelectedAccent] = createSignal("#4F46E5");
-  const [selectedModel, setSelectedModel] = createSignal("tiny");
-  const [selectedLanguage, setSelectedLanguage] = createSignal("auto");
-  const [notifications, setNotifications] = createSignal(true);
+  const { settings, updateSetting } = settingsStore;
   
-  // AI Pipeline Signals
-  const [transcriptionEngine, setTranscriptionEngine] = createSignal<"local" | "cloud">("local");
-  const [intelligenceEngine, setIntelligenceEngine] = createSignal<"local" | "cloud">("cloud");
-  const [cloudProvider, setCloudProvider] = createSignal<"gemini" | "mistral">("gemini");
+  const [ffmpegStatus, setFfmpegStatus] = createSignal<{
+    is_available: boolean;
+    path?: string;
+    version?: string;
+  }>({ is_available: false });
 
-  const handleSave = () => {
-    showToast("Settings saved successfully!", "success");
+  const [apiKeysStatus, setApiKeysStatus] = createSignal({
+    gemini: false,
+    groq: false,
+    mistral: false
+  });
+
+  const [newKeys, setNewKeys] = createSignal({
+    gemini: "",
+    groq: "",
+    mistral: ""
+  });
+
+  const [isSaving, setIsSaving] = createSignal(false);
+  const [appVersion, setAppVersion] = createSignal("0.1.0");
+
+  onMount(async () => {
+    // Check FFmpeg
+    try {
+      const status = await invoke<any>("check_ffmpeg_status");
+      setFfmpegStatus(status);
+    } catch (e) {
+      console.error("FFmpeg check failed:", e);
+    }
+
+    // Check API Keys status
+    const providers = ["gemini", "groq", "mistral"] as const;
+    const status: any = {};
+    for (const p of providers) {
+      status[p] = await invoke("get_api_key_status", { provider: p }).catch(() => false);
+    }
+    setApiKeysStatus(status);
+
+    // Get App Info
+    const info = await invoke<string>("get_app_info").catch(() => "FastClip v0.1.0");
+    setAppVersion(info.split(" v")[1] || "0.1.0");
+  });
+
+  const handleSaveKeys = async () => {
+    setIsSaving(true);
+    try {
+      if (newKeys().gemini) await invoke("set_api_key", { provider: "gemini", key: newKeys().gemini });
+      if (newKeys().groq) await invoke("set_api_key", { provider: "groq", key: newKeys().groq });
+      if (newKeys().mistral) await invoke("set_api_key", { provider: "mistral", key: newKeys().mistral });
+      
+      showToast("API keys stored securely!", "success");
+      setNewKeys({ gemini: "", groq: "", mistral: "" });
+      
+      // Refresh status
+      const providers = ["gemini", "groq", "mistral"] as const;
+      const status: any = {};
+      for (const p of providers) {
+        status[p] = await invoke("get_api_key_status", { provider: p }).catch(() => false);
+      }
+      setApiKeysStatus(status);
+    } catch (e) {
+      showToast("Failed to save keys: " + e, "error");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleSaveSettings = () => {
+    showToast("General settings saved!", "success");
   };
 
   return (
@@ -103,12 +157,12 @@ export default function SettingsPage() {
                   <button
                     class={cn(
                       "w-9 h-9 rounded-lg transition-all border-2",
-                      selectedAccent() === color.value
+                      settings().accentColor === color.name.toLowerCase()
                         ? "border-white scale-110 shadow-lg"
                         : "border-transparent hover:scale-105"
                     )}
-                    style={{ background: color.value, "box-shadow": selectedAccent() === color.value ? `0 4px 20px ${color.value}40` : "none" }}
-                    onClick={() => setSelectedAccent(color.value)}
+                    style={{ background: color.value, "box-shadow": settings().accentColor === color.name.toLowerCase() ? `0 4px 20px ${color.value}40` : "none" }}
+                    onClick={() => updateSetting("accentColor", color.name.toLowerCase() as any)}
                     title={color.name}
                   />
                 )}
@@ -120,12 +174,12 @@ export default function SettingsPage() {
             icon={Monitor}
             iconColor="bg-cyan-500/10 text-cyan-500"
             label="Theme"
-            description="OLED Black is active"
+            description={`${settings().theme.replace("-", " ").toUpperCase()} is active`}
             noBorder
             action={
-              <span class="tag">
+              <span class="tag capitalize">
                 <div class="w-2 h-2 rounded-full bg-black border border-white/20" />
-                OLED Black
+                {settings().theme.replace("-", " ")}
               </span>
             }
           />
@@ -142,16 +196,24 @@ export default function SettingsPage() {
             icon={FolderOpen}
             iconColor="bg-primary/10 text-primary"
             label="Export Directory"
-            description="Where saved clips are stored"
-            action={<button class="btn-glass text-[9px] tracking-widest" onClick={() => showToast("File picker opened", "info")}>Browse...</button>}
+            description={settings().exportDirectory || "No directory selected"}
+            action={<button class="btn-glass text-[9px] tracking-widest" onClick={async () => {
+              const { open } = await import("@tauri-apps/plugin-dialog");
+              const selected = await open({ directory: true });
+              if (selected) updateSetting("exportDirectory", selected);
+            }}>Browse...</button>}
           />
 
           <SettingRow
             icon={Package}
-            iconColor="bg-amber-500/10 text-amber-500"
-            label="FFmpeg Path"
-            description="External FFmpeg binary location"
-            action={<span class="badge badge-success">Bundled ✓</span>}
+            iconColor={ffmpegStatus().is_available ? "bg-emerald-500/10 text-emerald-500" : "bg-rose-500/10 text-rose-500"}
+            label="FFmpeg Status"
+            description={ffmpegStatus().is_available ? `Found: ${ffmpegStatus().version || "Unknown Version"}` : "FFmpeg not found in PATH"}
+            action={
+              <Show when={ffmpegStatus().is_available} fallback={<span class="badge badge-error">Missing ✗</span>}>
+                <span class="badge badge-success">Detected ✓</span>
+              </Show>
+            }
           />
 
           <SettingRow
@@ -164,13 +226,13 @@ export default function SettingsPage() {
               <button
                 class={cn(
                   "w-12 h-7 rounded-full transition-all relative",
-                  notifications() ? "bg-primary" : "bg-white/10"
+                  settings().autoUpdate ? "bg-primary" : "bg-white/10"
                 )}
-                onClick={() => setNotifications(!notifications())}
+                onClick={() => updateSetting("autoUpdate", !settings().autoUpdate)}
               >
                 <div class={cn(
                   "absolute top-1 w-5 h-5 bg-white rounded-full shadow-lg transition-all",
-                  notifications() ? "left-6" : "left-1"
+                  settings().autoUpdate ? "left-6" : "left-1"
                 )} />
               </button>
             }
@@ -188,7 +250,6 @@ export default function SettingsPage() {
         </div>
         
         <div class="space-y-6">
-          {/* Transcription Strategy */}
           <div class="glass-card-flat space-y-5">
             <div class="flex items-center justify-between">
               <div>
@@ -196,124 +257,24 @@ export default function SettingsPage() {
                 <p class="text-[10px] text-slate-500 mt-0.5">How audio is converted to searchable text</p>
               </div>
               <div class="flex p-1 bg-black/40 rounded-xl border border-white/5">
-                <button 
-                  onClick={() => setTranscriptionEngine("local")}
-                  class={cn(
-                    "px-4 py-1.5 rounded-lg text-[10px] font-black transition-all",
-                    transcriptionEngine() === "local" ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-slate-500 hover:text-white"
-                  )}
-                >LOCAL</button>
-                <button 
-                  onClick={() => setTranscriptionEngine("cloud")}
-                  class={cn(
-                    "px-4 py-1.5 rounded-lg text-[10px] font-black transition-all",
-                    transcriptionEngine() === "cloud" ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "text-slate-500 hover:text-white"
-                  )}
-                >CLOUD</button>
+                <button class={cn("px-4 py-1.5 rounded-lg text-[10px] font-black transition-all bg-primary text-white shadow-lg shadow-primary/20")}>LOCAL</button>
               </div>
             </div>
 
-            <Show when={transcriptionEngine() === "local"}>
-              <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.03] space-y-4 animate-scale-in">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <div class="p-2 bg-indigo-500/10 rounded-lg text-indigo-400"><HardDrive size={14} /></div>
-                    <span class="text-xs font-bold text-slate-300">Whisper Local (CPU/GPU)</span>
-                  </div>
-                  <Dropdown
-                    options={whisperOptions}
-                    value={selectedModel()}
-                    onChange={setSelectedModel}
-                  />
-                </div>
-                <p class="text-[10px] text-slate-500 leading-relaxed italic">Runs entirely on your machine. Privacy-first, no internet required.</p>
-              </div>
-            </Show>
-
-            <Show when={transcriptionEngine() === "cloud"}>
-              <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.03] space-y-4 animate-scale-in">
-                <div class="flex items-center justify-between">
-                  <div class="flex items-center gap-3">
-                    <div class="p-2 bg-emerald-500/10 rounded-lg text-emerald-400"><Globe size={14} /></div>
-                    <span class="text-xs font-bold text-slate-300">Groq Whisper-v3</span>
-                  </div>
-                  <span class="badge badge-success !px-2 py-0.5 !text-[7px]">Ultra Fast</span>
-                </div>
-                <p class="text-[10px] text-slate-500 leading-relaxed italic">Near-instant transcription (10x faster). Requires Groq API Key.</p>
-              </div>
-            </Show>
-          </div>
-
-          {/* Analysis Strategy */}
-          <div class="glass-card-flat space-y-5">
-            <div class="flex items-center justify-between">
-              <div>
-                <p class="text-sm font-bold text-white">Clip Intelligence</p>
-                <p class="text-[10px] text-slate-500 mt-0.5">Brain used for finding highlights & scene detection</p>
-              </div>
-              <div class="flex p-1 bg-black/40 rounded-xl border border-white/5">
-                <button 
-                  onClick={() => setIntelligenceEngine("local")}
-                  class={cn(
-                    "px-4 py-1.5 rounded-lg text-[10px] font-black transition-all",
-                    intelligenceEngine() === "local" ? "bg-primary text-white shadow-lg shadow-primary/20" : "text-slate-500 hover:text-white"
-                  )}
-                >LOCAL</button>
-                <button 
-                  onClick={() => setIntelligenceEngine("cloud")}
-                  class={cn(
-                    "px-4 py-1.5 rounded-lg text-[10px] font-black transition-all",
-                    intelligenceEngine() === "cloud" ? "bg-emerald-500 text-white shadow-lg shadow-emerald-500/20" : "text-slate-500 hover:text-white"
-                  )}
-                >CLOUD</button>
-              </div>
-            </div>
-
-            <Show when={intelligenceEngine() === "local"}>
-              <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.03] space-y-4 animate-scale-in">
+            <div class="p-4 rounded-xl bg-white/[0.02] border border-white/[0.03] space-y-4 animate-scale-in">
+              <div class="flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                  <div class="p-2 bg-violet-500/10 rounded-lg text-violet-400"><Sparkles size={14} /></div>
-                  <span class="text-xs font-bold text-slate-300">Gemma-4 Multimodal</span>
+                  <div class="p-2 bg-indigo-500/10 rounded-lg text-indigo-400"><HardDrive size={14} /></div>
+                  <span class="text-xs font-bold text-slate-300">Whisper Local (CPU/GPU)</span>
                 </div>
-                <p class="text-[10px] text-slate-500 leading-relaxed italic">Analyzes video frames locally. Requires 8GB VRAM (NVIDIA/Metal).</p>
-                <div class="flex items-center gap-2 px-3 py-2 bg-amber-500/5 rounded-lg border border-amber-500/10">
-                  <Package size={12} class="text-amber-500" />
-                  <span class="text-[9px] font-bold text-amber-500 uppercase tracking-widest">Self-Hosted via mistral.rs</span>
-                </div>
+                <Dropdown
+                  options={whisperOptions}
+                  value={settings().whisperModel}
+                  onChange={(v) => updateSetting("whisperModel", v as any)}
+                />
               </div>
-            </Show>
-
-            <Show when={intelligenceEngine() === "cloud"}>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 animate-scale-in">
-                <div 
-                  onClick={() => setCloudProvider("gemini")}
-                  class={cn(
-                    "p-4 rounded-xl border transition-all cursor-pointer group",
-                    cloudProvider() === "gemini" ? "bg-primary/10 border-primary/40 shadow-xl" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04]"
-                  )}
-                >
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="text-xs font-bold text-white group-hover:text-primary transition-colors">Gemini 1.5 Pro</span>
-                    <Globe size={12} class="text-slate-600" />
-                  </div>
-                  <p class="text-[9px] text-slate-500 leading-tight">Best for long-form video context and complex reasoning.</p>
-                </div>
-
-                <div 
-                  onClick={() => setCloudProvider("mistral")}
-                  class={cn(
-                    "p-4 rounded-xl border transition-all cursor-pointer group",
-                    cloudProvider() === "mistral" ? "bg-primary/10 border-primary/40 shadow-xl" : "bg-white/[0.02] border-white/5 hover:bg-white/[0.04]"
-                  )}
-                >
-                  <div class="flex items-center justify-between mb-3">
-                    <span class="text-xs font-bold text-white group-hover:text-primary transition-colors">Mistral Large</span>
-                    <Globe size={12} class="text-slate-600" />
-                  </div>
-                  <p class="text-[9px] text-slate-500 leading-tight">Superior logic for metadata and transcript analysis.</p>
-                </div>
-              </div>
-            </Show>
+              <p class="text-[10px] text-slate-500 leading-relaxed italic">Runs entirely on your machine. Privacy-first, no internet required.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -325,6 +286,7 @@ export default function SettingsPage() {
         </h4>
         <div class="glass-card-flat !p-0 overflow-hidden isolate">
           <div class="p-6 space-y-6">
+            {/* Gemini */}
             <div class="space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
@@ -332,16 +294,22 @@ export default function SettingsPage() {
                   <a href="https://aistudio.google.com/app/apikey" target="_blank" class="text-slate-500 hover:text-primary transition-colors">
                     <ExternalLink size={12} />
                   </a>
+                  <Show when={apiKeysStatus().gemini}>
+                    <Check size={14} class="text-emerald-500" />
+                  </Show>
                 </div>
                 <span class="text-[10px] font-black uppercase tracking-widest text-slate-600">Google AI Studio</span>
               </div>
               <input
                 type="password"
-                placeholder="Paste Gemini API Key..."
+                value={newKeys().gemini}
+                onInput={(e) => setNewKeys(prev => ({ ...prev, gemini: e.currentTarget.value }))}
+                placeholder={apiKeysStatus().gemini ? "••••••••••••••••" : "Paste Gemini API Key..."}
                 class="input-glass"
               />
             </div>
 
+            {/* Groq */}
             <div class="space-y-4">
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
@@ -349,39 +317,40 @@ export default function SettingsPage() {
                   <a href="https://console.groq.com/keys" target="_blank" class="text-slate-500 hover:text-primary transition-colors">
                     <ExternalLink size={12} />
                   </a>
+                  <Show when={apiKeysStatus().groq}>
+                    <Check size={14} class="text-emerald-500" />
+                  </Show>
                 </div>
                 <span class="text-[10px] font-black uppercase tracking-widest text-slate-600">Groq Cloud</span>
               </div>
               <input
                 type="password"
-                placeholder="Paste Groq API Key..."
+                value={newKeys().groq}
+                onInput={(e) => setNewKeys(prev => ({ ...prev, groq: e.currentTarget.value }))}
+                placeholder={apiKeysStatus().groq ? "••••••••••••••••" : "Paste Groq API Key..."}
                 class="input-glass"
               />
             </div>
-
-            <div class="space-y-4">
-              <div class="flex items-center justify-between">
-                <div class="flex items-center gap-2">
-                  <label class="text-sm font-bold text-white">Mistral API Key</label>
-                  <a href="https://console.mistral.ai/api-keys/" target="_blank" class="text-slate-500 hover:text-primary transition-colors">
-                    <ExternalLink size={12} />
-                  </a>
-                </div>
-                <span class="text-[10px] font-black uppercase tracking-widest text-slate-600">Mistral La Plateforme</span>
-              </div>
-              <input
-                type="password"
-                placeholder="Paste Mistral API Key..."
-                class="input-glass"
-              />
-            </div>
+          </div>
+          
+          <div class="p-6 bg-white/[0.02] border-t border-white/5 flex justify-end">
+             <button 
+              class="btn-primary flex items-center gap-2" 
+              onClick={handleSaveKeys}
+              disabled={isSaving() || (!newKeys().gemini && !newKeys().groq && !newKeys().mistral)}
+            >
+              <Show when={isSaving()} fallback={<Key size={14} />}>
+                <div class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              </Show>
+              Save Keys to System Wallet
+            </button>
           </div>
         </div>
       </section>
 
       {/* Save Button */}
       <div class="flex justify-end animate-fade-in stagger-5" style="opacity:0">
-        <button class="btn-primary" onClick={handleSave}>
+        <button class="btn-primary" onClick={handleSaveSettings}>
           Save Preferences
         </button>
       </div>
@@ -389,7 +358,7 @@ export default function SettingsPage() {
       {/* About */}
       <section class="pt-8 flex items-center justify-between text-slate-500 animate-fade-in stagger-6" style="opacity:0">
         <div class="flex items-center gap-3">
-          <div class="text-[10px] font-bold uppercase tracking-[0.2em]">FastClip v0.1.0-beta</div>
+          <div class="text-[10px] font-bold uppercase tracking-[0.2em]">FastClip v{appVersion()}</div>
           <span class="badge badge-processing">Beta</span>
         </div>
         <div class="flex items-center gap-6">
